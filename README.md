@@ -70,3 +70,34 @@ python train_ar_top200.py --knn-model <自己的KNN目录> --background-ar <自�
 该流水线保留本项目的实验目录约定，需要自行提供清单、既有缓存和划分文件；它不是开箱即用的数据下载器。16k有效带宽在重采样后不会恢复。响度目标也不代表每首实测值精确等于目标。
 
 其他脚本保留研究用途；模型选择只应使用训练/验证数据。测试集用于报告，跨实验比较应使用相同留出歌曲。上游模型及依赖遵循各自许可。
+
+## 传统机器学习实验
+
+`traditional_preference_experiment.py` 使用冻结的音频向量，对比加权 KNN、相对 KNN、加权核密度、相对核密度、多兴趣 KMeans、正则化高斯混合、单类 SVM 和孤立森林。随机森林单独预测已知播放强度，不把未收藏歌曲标成不喜欢。相对核方法比较个人收藏支持度与背景库支持度。
+
+`compare_kernel_dimensions.py` 展示 PCA64/128/192/256/512 与原生1024维的 KNN/KDE 结果，包括每个维数的验证选参、固定参数对照及完整排名。维数和超参数按验证集选择，测试集只用于报告；这些是正样本与未标记样本的检索代理指标。
+
+```powershell
+python -m unittest test_traditional_preference -v
+python traditional_preference_experiment.py
+python compare_kernel_dimensions.py
+```
+
+这些研究入口复用本项目约定的本地缓存、训练划分、元数据和实验目录。运行前应查看脚本顶部路径及依赖的本地实验产物，改为自己的数据；仓库不附带这些文件。它们不需要训练新的神经网络，但现有 CLAP 特征仍来自预训练音频编码器。传统方法保存搜索记录、指标和比较图，不伪造梯度学习率曲线。
+
+## 标签条件与权重消融
+
+`train_tagged_ar_experiment.py` / `run_tagged_ar_dimensions.py` 对比纯音频、只加行为权重、只加标签条件、标签与权重同时加入的相对 AR。`run_ar_pca_dimension_sweep.py` 提供纯音频维数基线。
+
+`train_tagged_diffusion_sweep.py` 将相同条件与权重实验用于相对扩散，保存模型、原始日志、逐轮 loss/LR、完整排名与汇总图。评分使用个人/背景模型共享的固定高斯噪声；`verify_tagged_diffusion_sweep.py` 从导出结果复核划分、曲库覆盖和 AUC。
+
+标签估计器只读取训练集注释，为所有歌曲统一生成条件，训练歌曲排除自身；不把待测歌曲是否有标签直接作为收藏身份线索。缺失标签较多时，这种估计条件可能带来噪声，不能把条件模型效果等同于真实标签的价值。行为权重用于归一化加权损失，不同时重复做加权采样。
+
+```powershell
+python -m unittest test_tagged_ar test_tagged_diffusion -v
+python run_ar_pca_dimension_sweep.py --dimensions 64 128 192 256 512
+python run_tagged_ar_dimensions.py
+python train_tagged_diffusion_sweep.py
+```
+
+所有训练串行执行。默认实验路径用于复现实验流程，需要自行准备；个人音频、标签、向量、模型、日志与排行榜继续由 `.gitignore` 排除。
